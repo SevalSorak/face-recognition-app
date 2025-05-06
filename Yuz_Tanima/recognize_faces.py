@@ -3,6 +3,7 @@ import os
 import pickle
 from deepface import DeepFace
 import numpy as np
+import json
 
 def load_models():
     # label_mappings.pkl dosyasını yükle
@@ -92,3 +93,68 @@ def start_face_recognition():
 
     cap.release()
     cv2.destroyAllWindows()
+
+def recognize_face(image_path):
+    face_data_dir, label_map = load_models()
+    detector = "mtcnn"  # Alternatif: "opencv" veya "dlib"
+
+    try:
+        frame = cv2.imread(image_path)
+        if frame is None:
+            return {"status": "error", "message": "Görüntü okunamadı"}
+
+        results = DeepFace.find(
+            img_path=frame,
+            db_path=face_data_dir,
+            model_name="Facenet",
+            detector_backend=detector,
+            enforce_detection=False,
+            distance_metric="euclidean_l2"
+        )
+
+        recognized_faces = []
+        for result in results:
+            if result.empty:
+                continue
+
+            x = int(result["source_x"].iloc[0])
+            y = int(result["source_y"].iloc[0])
+            w = int(result["source_w"].iloc[0])
+            h = int(result["source_h"].iloc[0])
+            if w < 50 or h < 50:
+                continue
+
+            identity = result["identity"].iloc[0]
+            confidence = result["distance"].iloc[0]
+
+            label = None
+            for lbl, user_info in label_map.items():
+                user_folder = f"{user_info['user_id']}_{user_info['name']}_{user_info['surname']}"
+                if user_folder in identity:
+                    label = lbl
+                    break
+
+            if label is not None and confidence < 1.0:
+                user_info = label_map.get(label, {"name": "Bilinmeyen", "surname": ""})
+                name_text = f"{user_info['name']} {user_info['surname']}"
+            else:
+                name_text = "Bilinmeyen"
+                label = "Yok"
+
+            recognized_faces.append({
+                "coordinates": {"x": x, "y": y, "w": w, "h": h},
+                "label": label,
+                "confidence": float(confidence),
+                "name": name_text
+            })
+
+        if not recognized_faces:
+            return {"status": "error", "message": "Yüz algılanmadı veya eşleşme bulunamadı"}
+
+        return {
+            "status": "success",
+            "faces": recognized_faces
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": f"Hata: {str(e)}"}
