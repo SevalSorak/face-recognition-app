@@ -1,20 +1,23 @@
 import cv2
 import os
 import pickle
-from mtcnn import MTCNN
+from deepface import DeepFace
+import numpy as np
 
 def load_models():
-    recognizer = cv2.face.LBPHFaceRecognizer_create()
-    recognizer.read("trained_face_model.yml")
+    # label_mappings.pkl dosyasını yükle
     with open("label_mappings.pkl", "rb") as f:
         label_map = pickle.load(f)
-    return recognizer, label_map
+    # DeepFace için veri tabanı yolunu hazırla
+    face_data_dir = "face_data"
+    return face_data_dir, label_map
 
 def start_face_recognition():
-    recognizer, label_map = load_models()
-    detector = MTCNN()
+    face_data_dir, label_map = load_models()
+    # DeepFace dedektörü (MTCNN kullanıyoruz, alternatif: opencv, dlib)
+    detector = "mtcnn"
+    
     cap = cv2.VideoCapture(0)
-
     if not cap.isOpened():
         print("Kamera açılamadı.")
         return
@@ -24,31 +27,64 @@ def start_face_recognition():
         if not ret:
             break
 
-        faces = detector.detect_faces(frame)
-        for face in faces:
-            x, y, w, h = face['box']
-            x, y = max(0, x), max(0, y)
-            face_img = frame[y:y+h, x:x+w]
-            gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
-            resized = cv2.resize(gray, (100, 100))
+        try:
+            # DeepFace ile yüz tanıma
+            results = DeepFace.find(
+                img_path=frame,
+                db_path=face_data_dir,
+                model_name="Facenet",
+                detector_backend=detector,
+                enforce_detection=False,
+                distance_metric="euclidean_l2"
+            )
+            
+            # Her algılanan yüz için işlem yap
+            for result in results:
+                if result.empty:
+                    continue
+                    
+                # Yüz koordinatlarını al
+                x = int(result["source_x"].iloc[0])
+                y = int(result["source_y"].iloc[0])
+                w = int(result["source_w"].iloc[0])
+                h = int(result["source_h"].iloc[0])
+                
+                # Küçük yüzleri filtrele
+                if w < 50 or h < 50:
+                    continue
 
-            try:
-                label, confidence = recognizer.predict(resized)
-                print(f"Yüz koordinatları: ({x}, {y}, {w}, {h}) | Tahmin: {label} | Güven: {confidence:.2f}")
-                if confidence < 80:  # Eşik değeri (80'i deneysel olarak ayarlayabilirsiniz)
+                # Kimlik dosya yolunu al
+                identity = result["identity"].iloc[0]
+                # Güven skoru (mesafe, düşük değer daha iyi)
+                confidence = result["distance"].iloc[0]
+                
+                # label_map ile eşleştir
+                label = None
+                for lbl, user_info in label_map.items():
+                    user_folder = f"{user_info['user_id']}_{user_info['name']}_{user_info['surname']}"
+                    if user_folder in identity:
+                        label = lbl
+                        break
+                
+                if label is not None and confidence < 1.0:  # DeepFace için güven eşiği (1.0 uygun bir başlangıç)
                     user_info = label_map.get(label, {"name": "Bilinmeyen", "surname": ""})
                     name_text = f"{user_info['name']} {user_info['surname']}"
                 else:
                     name_text = "Bilinmeyen"
+                
+                # Çıktıyı önceki formatta yazdır
+                print(f"Yüz koordinatları: ({x}, {y}, {w}, {h}) | Tahmin: {label if label is not None else 'Yok'} | Güven: {confidence:.2f}")
+                print(f"[CONF] Tahmin: {label if label is not None else 'Yok'} - Güven: {confidence:.2f}")
 
-                print(f"[CONF] Tahmin: {label} - Güven: {confidence:.2f}")
-                user_info = label_map.get(label, {"name": "Bilinmeyen", "surname": ""})
-                name_text = f"{user_info['name']} {user_info['surname']}"
-            except:
-                name_text = "Tanımlanamadı"
+                # Dikdörtgen ve isim çiz
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                cv2.putText(frame, name_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-            cv2.putText(frame, name_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        except Exception as e:
+            print(f"Hata: {e}")
+            name_text = "Tanımlanamadı"
+            # Hata durumunda devam et
+            continue
 
         cv2.imshow("Yüz Tanıma", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
