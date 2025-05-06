@@ -2,6 +2,7 @@ import cv2
 import os
 import time
 from mtcnn import MTCNN
+import unicodedata
 
 # Yüz verilerini kaydedeceğiniz dizin
 def create_output_dir(output_dir="face_data"):
@@ -9,7 +10,7 @@ def create_output_dir(output_dir="face_data"):
         os.makedirs(output_dir)
 
 # Yüz verilerini kaydetme fonksiyonu
-def collect_face_data(name, surname, user_id, output_dir="face_data", directions=None, frames_per_direction=10):
+def collect_face_data(name, surname, user_id, output_dir="face_data", directions=None, frames_per_direction=20):
     if directions is None:
         directions = ["Önden", "Sağ", "Sol"]  # Varsayılan yönler
 
@@ -19,60 +20,63 @@ def collect_face_data(name, surname, user_id, output_dir="face_data", directions
     # Kamerayı aç
     cap = cv2.VideoCapture(0)
 
-    # Yüz verilerini kaydetmek için sayaç
-    img_counter = 0
-    direction_counter = 0  # Yön sayacı
+    user_folder_name = f"{user_id}_{name}_{surname}".replace(" ", "_")
+    user_folder_path = os.path.join(output_dir, user_folder_name)
+    os.makedirs(user_folder_path, exist_ok=True)
 
+    direction_counter = 0  # yön geçişi
     # Yönler sırasıyla: Önden -> Sağ -> Sol
     while direction_counter < len(directions):
         print(f"Lütfen yüzünüzü {directions[direction_counter]} çevirin.")
-        frame_counter = 0  # her bir yön için kare sayacı
-        face_detected = False  # Yüz algılanıp algılanmadığını kontrol et
+        face_saved_count = 0  # Sadece kaydedilen yüz sayısı
+        face_detected_once = False
 
-        while frame_counter < frames_per_direction:  # Her yön için kare sayısı kadar veri alıyoruz
+        while face_saved_count < frames_per_direction:
             ret, frame = cap.read()
             if not ret:
-                print("Kamera açılmadı.")
+                print("Kamera açılamadı.")
                 break
 
             # Yüzleri algılamak için MTCNN kullanma
-            results = detector.detect_faces(frame)
+            results = detector.detect_faces(
+                frame,
+                min_face_size=15,  # Daha küçük yüzleri algıla
+                threshold_pnet=0.5,  # PNet'ten daha fazla öneri
+                threshold_rnet=0.6,  # RNet filtrelemesini gevşet
+                threshold_onet=0.7   # ONet'ten daha fazla yüz kabul et
+            )
 
-            # Eğer yüz algılandıysa
-            if len(results) > 0:
-                face_detected = True
+            if results:
+                face_detected_once = True
                 for result in results:
-                    # Yüzün konumunu belirleyelim
-                    (x, y, w, h) = result['box']
+                    x, y, w, h = result['box']
+                    x, y = max(0, x), max(0, y)
+                    face_image = frame[y:y+h, x:x+w]
 
-                    # Yüzü etrafında dikdörtgen çizme
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    if face_image.size == 0 or face_image.shape[0] < 50 or face_image.shape[1] < 50:
+                        continue
 
-                    # Yüz verisini kaydetme
-                    face_image = frame[y:y + h, x:x + w]
-                    timestamp = time.time()  # Şu anki zaman damgası
-                    timestamp_ms = int((timestamp % 1) * 1000)  # Milisaniye kısmını al
-                    img_name = os.path.join(output_dir, f"{name}_{surname}_{user_id}_{int(timestamp)}_{timestamp_ms}.jpg")
+                    timestamp = time.time()
+                    timestamp_ms = int((timestamp % 1) * 1000)
+                    normalized_name = unicodedata.normalize('NFKD', f"{name}_{surname}_{user_id}_{int(timestamp)}_{timestamp_ms}").encode('ASCII', 'ignore').decode('ASCII')
+                    img_name = os.path.join(user_folder_path, f"{normalized_name}.jpg")
                     cv2.imwrite(img_name, face_image)
                     print(f"Yüz verisi kaydedildi: {img_name}")
-                    img_counter += 1
+                    face_saved_count += 1
 
-            # Görüntüyü ekranda gösterme
-            cv2.imshow(f"Face Detection - {directions[direction_counter]}", frame)
+                    # Görselde dikdörtgen çiz (kare ekranda görülsün)
+                    cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-            # Kare sayacını arttır
-            frame_counter += 1
+            else:
+                print("⚠️ Yüz algılanmadı, tekrar deneyin.")
 
-            # 'q' tuşuna basarak çıkış yapma
+            cv2.imshow(f"Yüz Algılama - {directions[direction_counter]}", frame)
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
-        if not face_detected:
-            print(f"{directions[direction_counter]} yönü için yüz tespit edilemedi.")
-        
-        # Bir yön tamamlandı, diğerine geçiş için yön sayacını arttır
         print(f"{directions[direction_counter]} yönü tamamlandı.")
-        direction_counter += 1  # Bir yön tamamlandıktan sonra diğerine geç
+        direction_counter += 1
 
     # Kamera kapanması
     cap.release()
