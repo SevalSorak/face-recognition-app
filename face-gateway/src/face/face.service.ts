@@ -1,7 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import axios from 'axios';
-import * as FormData from 'form-data';
+import axios, { AxiosResponse } from 'axios';
+import FormData from 'form-data';
 import * as fs from 'fs';
+
+interface RecognitionResult {
+  confidence: number;
+  label: number;
+  name: string;
+}
+
+interface RecognitionResponse {
+  results: RecognitionResult[];
+  status: string;
+}
+
+interface AddFaceResponse {
+  message: string;
+  status: string;
+}
 
 @Injectable()
 export class FaceService {
@@ -12,7 +28,7 @@ export class FaceService {
     form.append('surname', surname);
     form.append('user_id', userId);
 
-    const response = await axios.post('http://localhost:5000/add-face', form, {
+    const response: AxiosResponse<AddFaceResponse> = await axios.post('http://192.168.68.71:5050/add-face', form, {
       headers: form.getHeaders(),
     });
 
@@ -23,7 +39,7 @@ export class FaceService {
     const form = new FormData();
     form.append('image', fs.createReadStream(imagePath));
 
-    const response = await axios.post('http://localhost:5000/recognize-face', form, {
+    const response: AxiosResponse<RecognitionResponse> = await axios.post('http://192.168.68.71:5050/recognize-face', form, {
       headers: form.getHeaders(),
     });
 
