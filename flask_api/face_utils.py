@@ -37,7 +37,7 @@ def add_face_api(image_file, name, surname, user_id):
     print(f"📸 Görsel kaydedildi: {img_path}")
 
     # Eğitimi tetikle
-    train_model()
+    # train_model()
 
     return {"status": "success", "message": f"Görsel kaydedildi ve model güncellendi: {img_name}"}
 
