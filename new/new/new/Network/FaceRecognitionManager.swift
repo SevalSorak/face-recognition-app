@@ -26,7 +26,7 @@ class FaceRecognitionManager: ObservableObject {
     @Published var addFaceSuccess: Bool = false
     @Published var errorMessage: String?
 
-    private let baseURL = "http://localhost:5050"
+    private let baseURL = "https://88b0-159-146-84-133.ngrok-free.app"
 
     func addFace(image: UIImage, name: String, surname: String, userId: String) {
         guard let url = URL(string: "\(baseURL)/add-face") else {

@@ -11,6 +11,10 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+@app.route("/", methods=["GET"])
+def index():
+    return jsonify({"message": "Flask sunucu aktif", "status": "OK"})
+
 @app.route('/add-face', methods=['POST'])
 def add_face():
     # 'image' dosyalarını alıyoruz

@@ -28,7 +28,7 @@ export class FaceService {
     form.append('surname', surname);
     form.append('user_id', userId);
 
-    const response: AxiosResponse<AddFaceResponse> = await axios.post('http://127.0.0.1:5000/add-face', form, {
+    const response: AxiosResponse<AddFaceResponse> = await axios.post('https://27a3-159-146-84-133.ngrok-free.app/add-face', form, {
       headers: form.getHeaders(),
     });
 
@@ -39,7 +39,7 @@ export class FaceService {
     const form = new FormData();
     form.append('image', fs.createReadStream(imagePath));
 
-    const response: AxiosResponse<RecognitionResponse> = await axios.post('http://127.0.0.1:5000/recognize-face', form, {
+    const response: AxiosResponse<RecognitionResponse> = await axios.post('https://27a3-159-146-84-133.ngrok-free.app/recognize-face', form, {
       headers: form.getHeaders(),
     });
 
