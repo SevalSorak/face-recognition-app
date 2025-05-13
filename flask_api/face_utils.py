@@ -16,16 +16,33 @@ def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path)
 
+# 🔁 Kare kırpma fonksiyonu
+def crop_square_face(img, x, y, w, h):
+    size = max(w, h)
+    center_x = x + w // 2
+    center_y = y + h // 2
+    half_size = size // 2
+
+    left = max(0, center_x - half_size)
+    top = max(0, center_y - half_size)
+    right = min(img.shape[1], center_x + half_size)
+    bottom = min(img.shape[0], center_y + half_size)
+
+    if right - left != size:
+        left = max(0, right - size)
+    if bottom - top != size:
+        top = max(0, bottom - size)
+
+    return img[top:bottom, left:right]
+
 # 🧠 Kullanıcıyı kaydetme fonksiyonu
 def add_face_api(image_file, name, surname, user_id):
     ensure_dir(FACE_DATA_DIR)
     
-    # Klasör adı: "123_Seval_Sorak"
     user_folder = f"{user_id}_{name}_{surname}".replace(" ", "_")
     user_path = os.path.join(FACE_DATA_DIR, user_folder)
     ensure_dir(user_path)
 
-    # Görseli oku ve kaydet
     image = Image.open(image_file.stream).convert('RGB')
     img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
@@ -67,7 +84,7 @@ def recognize_face_api(image_file):
             identity = result["identity"].iloc[0]
             confidence = float(result["distance"].iloc[0])
 
-            label = "Yok"
+            label = None
             name_text = "Bilinmeyen"
 
             for lbl, user in label_map.items():
@@ -97,7 +114,7 @@ def load_label_map():
     with open("label_mappings.pkl", "rb") as f:
         return pickle.load(f)
 
-# 🧠 LBPH eğitimi (mevcut kodun uyarlanmış hali)
+# 🧠 LBPH eğitimi (güncellenmiş hali)
 def train_model():
     recognizer = cv2.face.LBPHFaceRecognizer_create()
     detector = MTCNN()
@@ -133,7 +150,8 @@ def train_model():
             for result in results:
                 x, y, w, h = result['box']
                 x, y = max(0, x), max(0, y)
-                face_img = img[y:y+h, x:x+w]
+
+                face_img = crop_square_face(img, x, y, w, h)
 
                 if face_img.shape[0] < 50 or face_img.shape[1] < 50:
                     continue

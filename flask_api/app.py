@@ -70,4 +70,4 @@ def recognize_face():
         return jsonify({"error": "Yüz tanıma sırasında hata oluştu", "data": results}), 500
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5001)
