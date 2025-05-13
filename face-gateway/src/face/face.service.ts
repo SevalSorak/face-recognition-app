@@ -1,48 +1,126 @@
 import { Injectable } from '@nestjs/common';
-import axios, { AxiosResponse } from 'axios';
+import { ConfigService } from '@nestjs/config';
+import axios from 'axios';
 import FormData from 'form-data';
 import * as fs from 'fs';
 
-interface RecognitionResult {
-  confidence: number;
-  label: number;
-  name: string;
-}
-
-interface RecognitionResponse {
-  results: RecognitionResult[];
-  status: string;
-}
-
-interface AddFaceResponse {
-  message: string;
-  status: string;
-}
-
 @Injectable()
 export class FaceService {
-  async addFace(imagePath: string, name: string, surname: string, userId: string) {
-    const form = new FormData();
-    form.append('image', fs.createReadStream(imagePath));
-    form.append('name', name);
-    form.append('surname', surname);
-    form.append('user_id', userId);
+  private readonly flaskServiceUrl: string;
 
-    const response: AxiosResponse<AddFaceResponse> = await axios.post('https://e0f6-159-146-84-133.ngrok-free.app/add-face', form, {
-      headers: form.getHeaders(),
-    });
-
-    return response.data;
+  constructor(private configService: ConfigService) {
+    const url = this.configService.get<string>('FLASK_SERVICE_URL');
+    if (!url) {
+      throw new Error('FLASK_SERVICE_URL environment variable is not set');
+    }
+    this.flaskServiceUrl = url;
   }
 
-  async recognizeFace(imagePath: string) {
-    const form = new FormData();
-    form.append('image', fs.createReadStream(imagePath));
+  async addFace(filePath: string, name: string, surname: string, userId: string): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('image', fs.createReadStream(filePath));
+      formData.append('name', name);
+      formData.append('surname', surname);
+      formData.append('userId', userId);
+      formData.append('angle', 'front');
 
-    const response: AxiosResponse<RecognitionResponse> = await axios.post('hhttps://e0f6-159-146-84-133.ngrok-free.app/recognize-face', form, {
-      headers: form.getHeaders(),
-    });
+      const response = await axios.post(`${this.flaskServiceUrl}/register-face`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Yüz kaydetme hatası: ${error?.message || 'Bilinmeyen hata'}`);
+    }
+  }
+
+  async recognizeFace(filePath: string): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('image', fs.createReadStream(filePath));
+
+      const response = await axios.post(`${this.flaskServiceUrl}/recognize-face`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Yüz tanıma hatası: ${error?.message || 'Bilinmeyen hata'}`);
+    }
+  }
+
+  async addFaceBuffer(file: Express.Multer.File, name: string, surname: string, userId: string): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('image', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+      formData.append('name', name);
+      formData.append('surname', surname);
+      formData.append('userId', userId);
+      formData.append('angle', 'front');
+
+      const response = await axios.post(`${this.flaskServiceUrl}/register-face`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Yüz kaydetme hatası: ${error?.message || 'Bilinmeyen hata'}`);
+    }
+  }
+
+  async recognizeFaceBuffer(file: Express.Multer.File): Promise<any> {
+    try {
+      const formData = new FormData();
+      formData.append('image', file.buffer, {
+        filename: file.originalname,
+        contentType: file.mimetype,
+      });
+
+      const response = await axios.post(`${this.flaskServiceUrl}/recognize-face`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Yüz tanıma hatası: ${error?.message || 'Bilinmeyen hata'}`);
+    }
+  }
+
+  async addMultipleFaces(files: Express.Multer.File[], name: string, surname: string, userId: string, angle: string): Promise<any> {
+    try {
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('image', file.buffer, {
+          filename: file.originalname,
+          contentType: file.mimetype,
+        });
+      }
+      formData.append('name', name);
+      formData.append('surname', surname);
+      formData.append('userId', userId);
+      formData.append('angle', angle);
+
+      const response = await axios.post(`${this.flaskServiceUrl}/register-face`, formData, {
+        headers: {
+          ...formData.getHeaders(),
+        },
+      });
+
+      return response.data;
+    } catch (error: any) {
+      throw new Error(`Yüz kaydetme hatası: ${error?.message || 'Bilinmeyen hata'}`);
+    }
   }
 }

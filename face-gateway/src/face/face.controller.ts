@@ -1,47 +1,27 @@
-import { Controller, Post, UploadedFile, UseInterceptors, Body } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, UploadedFile, UseInterceptors, Body, UploadedFiles } from '@nestjs/common';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { FaceService } from './face.service';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { memoryStorage } from 'multer';
 
 @Controller('face')
 export class FaceController {
   constructor(private readonly faceService: FaceService) {}
 
-  @Post('add')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (_, file, cb) => {
-          const unique = Date.now() + extname(file.originalname);
-          cb(null, file.fieldname + '-' + unique);
-        },
-      }),
-    }),
-  )
-  async addFace(
-    @UploadedFile() file: Express.Multer.File,
+  @Post('register-face')
+  @UseInterceptors(FilesInterceptor('image', 50, { storage: memoryStorage() }))
+  async registerFace(
+    @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('name') name: string,
     @Body('surname') surname: string,
-    @Body('user_id') userId: string,
+    @Body('userId') userId: string,
+    @Body('angle') angle: string,
   ) {
-    return this.faceService.addFace(file.path, name, surname, userId);
+    return this.faceService.addMultipleFaces(files, name, surname, userId, angle);
   }
 
-  @Post('recognize')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (_, file, cb) => {
-          const unique = Date.now() + extname(file.originalname);
-          cb(null, file.fieldname + '-' + unique);
-        },
-      }),
-    }),
-  )
+  @Post('recognize-face')
+  @UseInterceptors(FileInterceptor('image', { storage: memoryStorage() }))
   async recognizeFace(@UploadedFile() file: Express.Multer.File) {
-    return this.faceService.recognizeFace(file.path);
+    return this.faceService.recognizeFaceBuffer(file);
   }
 }
