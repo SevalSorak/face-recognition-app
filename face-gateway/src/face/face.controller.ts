@@ -10,18 +10,19 @@ export class FaceController {
   @Post('register-face')
   @UseInterceptors(FilesInterceptor('image', 50, { storage: memoryStorage() }))
   async registerFace(
-    @UploadedFiles() files: Array<Express.Multer.File>,
+    @UploadedFiles() files: Express.Multer.File[],
     @Body('name') name: string,
     @Body('surname') surname: string,
     @Body('userId') userId: string,
-    @Body('angle') angle: string,
+    @Body('angle') angle: string,  // Swift’ten array olarak gelirse
   ) {
+    // Açıklama: angle, birden fazla görsel için farklı açılar göndermek istersen array olur
     return this.faceService.addMultipleFaces(files, name, surname, userId, angle);
   }
 
   @Post('recognize-face')
   @UseInterceptors(FileInterceptor('image', { storage: memoryStorage() }))
-  async recognizeFace(@UploadedFile() file: Express.Multer.File) {
+  async recognizeFace(@UploadedFile() file: Express.Multer.File) {  
     return this.faceService.recognizeFaceBuffer(file);
   }
 }

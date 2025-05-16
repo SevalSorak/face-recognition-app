@@ -105,9 +105,13 @@ def train_model():
 @app.route('/register-face', methods=['POST'])
 def register_face():
     try:
+        print('register-face')
         print('form:', request.form)
+        print('1')
         print('files:', request.files)
+        print('2')
         files = request.files.getlist('image')
+        print('3')
         user_id = request.form.get('userId')
         angle = request.form.get('angle')
         name = request.form.get('name')
@@ -227,4 +231,4 @@ def recognize_face():
 
 if __name__ == '__main__':
     ensure_directories()
-    app.run(port=5001, debug=True)
+    app.run(port=5001, debug=False)

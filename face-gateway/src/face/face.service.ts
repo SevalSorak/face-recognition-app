@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import FormData from 'form-data';
@@ -47,9 +47,16 @@ export class FaceService {
           ...formData.getHeaders(),
         },
       });
-
+      console.log(response.status);
+      if (response.status === 404) {
+        throw new HttpException('Yüz eşleşmesi bulunamadı', HttpStatus.NOT_FOUND);
+      }
       return response.data;
     } catch (error: any) {
+      console.log(error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
       throw new Error(`Yüz tanıma hatası: ${error?.message || 'Bilinmeyen hata'}`);
     }
   }
