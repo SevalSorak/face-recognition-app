@@ -23,7 +23,6 @@ Node.js tabanlı API gateway servisi. NestJS framework'ü kullanılarak gelişti
 ### 3. Flask API (`flask_api/`)
 Python Flask tabanlı API servisi. Yüz tanıma işlemlerini gerçekleştiren backend servisi.
 - Yüz tanıma işlemleri
-- Performans testleri
 - Yüz işleme yardımcı fonksiyonları
 
 ### 4. iOS Uygulaması (`ios/`)
@@ -76,7 +75,6 @@ python app.py
 ## Geliştirme
 
 - Face Gateway için test yazımı: `npm run test`
-- Flask API için performans testleri: `python performance_test.py`
 
 ## Katkıda Bulunma
 
