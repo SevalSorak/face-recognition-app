@@ -9,6 +9,10 @@ import pickle
 from PIL import Image
 import io
 import glob
+from functools import lru_cache
+import threading
+import queue
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -17,8 +21,21 @@ FACE_DATA_DIR = "face_data"
 MODEL_PATH = "trained_face_model.yml"
 LABEL_MAP_PATH = "label_mappings.pkl"
 
+# Global değişkenler
+model_training_queue = queue.Queue()
+is_training = False
+detector = MTCNN()  # MTCNN detector'ı global olarak oluştur
+
 def ensure_directories():
     os.makedirs(FACE_DATA_DIR, exist_ok=True)
+
+@lru_cache(maxsize=100)
+def load_label_mappings():
+    try:
+        with open(LABEL_MAP_PATH, "rb") as f:
+            return pickle.load(f)
+    except:
+        return {}
 
 def crop_square_face(img, x, y, w, h):
     size = max(w, h)
@@ -38,11 +55,15 @@ def crop_square_face(img, x, y, w, h):
 
     return img[top:bottom, left:right]
 
-def train_model():
+def train_model_async():
+    global is_training
+    if is_training:
+        return False
+    
+    is_training = True
     try:
         # LBPH modelini eğit
         recognizer = cv2.face.LBPHFaceRecognizer_create()
-        detector = MTCNN()
 
         faces = []
         labels = []
@@ -101,17 +122,18 @@ def train_model():
     except Exception as e:
         print(f"❌ Model eğitimi hatası: {str(e)}")
         return False
+    finally:
+        is_training = False
+
+def train_model():
+    if not is_training:
+        threading.Thread(target=train_model_async).start()
+    return True
 
 @app.route('/register-face', methods=['POST'])
 def register_face():
     try:
-        print('register-face')
-        print('form:', request.form)
-        print('1')
-        print('files:', request.files)
-        print('2')
         files = request.files.getlist('image')
-        print('3')
         user_id = request.form.get('userId')
         angle = request.form.get('angle')
         name = request.form.get('name')
@@ -133,9 +155,7 @@ def register_face():
             nparr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-            detector = MTCNN()
             results = detector.detect_faces(img)
-            print('Algılanan yüz sayısı:', len(results))
 
             for result in results:
                 x, y, w, h = result['box']
@@ -144,7 +164,6 @@ def register_face():
                 if face_img.shape[0] < 50 or face_img.shape[1] < 50:
                     continue
 
-                # Her fotoğrafı sıralı kaydet
                 face_path = os.path.join(user_dir, f"{angle}_{idx+1}.jpg")
                 cv2.imwrite(face_path, face_img)
                 face_saved = True
@@ -152,7 +171,7 @@ def register_face():
         if not face_saved:
             return jsonify({"status": "error", "message": "Yüz kaydedilemedi"}), 400
 
-        # Tüm fotoğraflar yüklendikten sonra modeli eğit
+        # Model eğitimini arka planda başlat
         model_updated = train_model()
 
         return jsonify({
